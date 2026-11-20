@@ -1404,7 +1404,7 @@ function minuteTick(d){
   if (sp.xmaseve && env.darkness>.6 && mi%12===0) startEvent('santa');
   if (sp.martin && h===17 && mi===0) startEvent('lanterns');
   if (mi%20===0){
-    if (sp.birthday) showMsg('ALLES GUTE ZUM GEBURTSTAG! ♥',30,3);
+    if (sp.birthday) showMsg(bdayText(),30,3);
     else if (sp.halloween) showMsg('HAPPY HALLOWEEN!',20,2);
     else if (sp.xmas) showMsg('FROHE WEIHNACHTEN!',20,2);
     else if (sp.carnival) showMsg('HELAU UND ALAAF – DAS DORF FEIERT KARNEVAL!',20,2);
@@ -1990,6 +1990,7 @@ var flagsDone={};
    EASTEREGGS: besondere Uhrzeiten, Tage, Jubiläen, Rekorde, seltene Zufälle
    ===================================================================== */
 var EGG={done:{}};
+function bdayText(){ var y=+CONFIG.birthYear; return y ? 'ALLES GUTE ZUM '+(now().getFullYear()-y)+'. GEBURTSTAG! ♥' : 'ALLES GUTE ZUM GEBURTSTAG! ♥'; }
 function eggOnce(key){ if (EGG.done[key]) return false; EGG.done[key]=1; return true; }
 var _unitParts2=unitParts;
 unitParts=function(u,X,Yb,f,act){
@@ -2054,7 +2055,7 @@ EVDEFS.binary={w:0, ok:function(){ return true; }, make:function(){
 /* Geburtstagstorte (Geburtstag aus config.js oder Song) */
 EVDEFS.cake={w:0, ok:function(){ return true; }, make:function(){
   outside().slice(0,10).forEach(function(u){ u.order={i:20,j:24,act:'cheer',dur:30}; u.state='idle'; });
-  return {msg:'HAPPY BIRTHDAY! ♥ DIE GANZE FESTUNG GRATULIERT!',update:function(dt){ if (R()<dt*3){ var p=iso(21,25); addPart({x:p[0]+rr(R,-8,8),y:p[1]-20,vx:rr(R,-10,10),vy:rr(R,-20,-5),g:20,life:0,max:2,col:pick(R,['#ff7fd8','#ffd84d','#7fd0ff','#8aff7f'])}); } return this.t<600; },
+  return {msg:env.sp.birthday?bdayText()+' DIE GANZE FESTUNG GRATULIERT!':'HAPPY BIRTHDAY! ♥ DIE GANZE FESTUNG GRATULIERT!',update:function(dt){ if (R()<dt*3){ var p=iso(21,25); addPart({x:p[0]+rr(R,-8,8),y:p[1]-20,vx:rr(R,-10,10),vy:rr(R,-20,-5),g:20,life:0,max:2,col:pick(R,['#ff7fd8','#ffd84d','#7fd0ff','#8aff7f'])}); } return this.t<600; },
     world:function(items,t){ var p=iso(21,25); items.push({depth:46,draw:function(g){ var x=Math.round(p[0]),y=Math.round(p[1]);
       drawRects(g,[[x-8,y-6,16,5,'#f4e4f0'],[x-6,y-11,12,5,'#ff9ac8'],[x-4,y-15,8,4,'#f4e4f0']]);
       for (var k=-3;k<4;k+=2){ px(g,'#f4f0e6',x+k,y-18,1,3); px(g,Math.floor(t*8+k)%2?'#ffd84d':'#ff9a30',x+k,y-19); }
