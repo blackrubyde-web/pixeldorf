@@ -1394,6 +1394,7 @@ function updateEvents(dt){
 function minuteTick(d){
   if (typeof extrasMinute==='function') extrasMinute(d);
   if (typeof newEventsMinute==='function') newEventsMinute(d);
+  if (typeof eggMinute==='function') eggMinute(d);
   var h=d.getHours(), mi=d.getMinutes(), sp=env.sp, key=d.toDateString();
   env.leet = h===13 && mi===37;
   if (env.leet) showMsg('13:37 – DAS DORF IST HEUTE BESONDERS LEET.',60,3);
@@ -1831,8 +1832,8 @@ unitParts=function(u,X,Yb,f,act){
       P.push([X-2,Yb-6,7,3,'#c8a060']); P.push([X,Yb-8,3,2,'#c8a060']); P.push([d>0?X+5:X-3,Yb-9,1,4,'#c8a060']); P.push([d>0?X+5:X-4,Yb-10,2,2,'#c8a060']);
       if (lg===2){ P.push([X-1,Yb-3,1,3,'#9a7840']); P.push([X+3,Yb-3,1,3,'#9a7840']); } else { P.push([X-1+lg,Yb-3,1,3,'#9a7840']); P.push([X+3-lg,Yb-3,1,3,'#9a7840']); }
       P.push([X,Yb-9,3,1,pick(rng(Math.floor(u.id*99)),['#c8402e','#3a78c9','#e8b030'])]); return P;
-    case 'bigchicken': var bb=u.state==='walk'&&f?1:0;
-      P.push([X-5,Yb-12-bb,12,9,'#f8f8f8']); P.push([d>0?X+4:X-6,Yb-17-bb,5,6,'#f8f8f8']); P.push([d>0?X+5:X-5,Yb-19-bb,3,2,'#e03030']);
+    case 'bigchicken': var bb=u.state==='walk'&&f?1:0, wc=u.gold?'#f2c13b':'#f8f8f8';
+      P.push([X-5,Yb-12-bb,12,9,wc]); P.push([d>0?X+4:X-6,Yb-17-bb,5,6,wc]); P.push([d>0?X+5:X-5,Yb-19-bb,3,2,'#e03030']);
       P.push([d>0?X+9:X-8,Yb-15-bb,2,2,'#f0a020']); P.push([d>0?X+6:X-4,Yb-15-bb,1,1,'#111']); P.push([X-2,Yb-3,1,3,'#f0a020']); P.push([X+3,Yb-3,1,3,'#f0a020']);
       P.push([d>0?X-6:X+6,Yb-13-bb,2,4,'#e8e8e0']); return P;
     case 'gnome': P.push([X+1,Yb-3,3,3,'#3a6ac8']); P.push([X+1,Yb-5,3,2,'#f0c8a0']); P.push([X+1,Yb-6,3,1,'#f4f4f4']); P.push([X+1,Yb-8,3,2,'#d02828']); P.push([X+2,Yb-9,1,1,'#d02828']); return P;
@@ -1985,6 +1986,148 @@ function newEventsMinute(d){
 }
 var flagsDone={};
 
+/* =====================================================================
+   EASTEREGGS: besondere Uhrzeiten, Tage, Jubiläen, Rekorde, seltene Zufälle
+   ===================================================================== */
+var EGG={done:{}};
+function eggOnce(key){ if (EGG.done[key]) return false; EGG.done[key]=1; return true; }
+var _unitParts2=unitParts;
+unitParts=function(u,X,Yb,f,act){
+  var P=[], d=u.dir;
+  if (u.kind==='cat'){ var c=u.col||'#222', lg=u.state==='walk'?f:0;
+    P.push([X-1,Yb-4,5,2,c]); P.push([d>0?X+3:X-2,Yb-6,2,2,c]); P.push([d>0?X+3:X-2,Yb-7,1,1,c]); P.push([d>0?X+4:X-1,Yb-7,1,1,c]);
+    P.push([d>0?X-2:X+4,Yb-6-lg,1,3,c]); P.push([X,Yb-2,1,2,c]); P.push([X+2,Yb-2,1,2,c]); return P; }
+  if (u.kind==='frog'){ var hop=Math.sin(u.anim*6)>.6?2:0; P.push([X,Yb-3-hop,4,3,'#f2c13b']); P.push([X,Yb-4-hop,1,1,'#fff3b0']); P.push([X+3,Yb-4-hop,1,1,'#fff3b0']); return P; }
+  return _unitParts2(u,X,Yb,f,act);
+};
+function wanderAI(speed){ return function(u,dt){ u.t2=(u.t2||0)-dt;
+  if (u.t2<=0){ u.t2=rr(R,2,6); var n=randomFree(Math.floor(u.x)-4,Math.floor(u.y)-4,Math.floor(u.x)+4,Math.floor(u.y)+4); if (n){ u.tx=n[0]+.5; u.ty=n[1]+.5; } }
+  if (u.tx!==undefined){ var dx=u.tx-u.x, dy=u.ty-u.y, dd=Math.hypot(dx,dy); if (dd>.05){ u.x+=dx/dd*Math.min(dd,dt*speed); u.y+=dy/dd*Math.min(dd,dt*speed); u.dir=dx-dy>0?1:-1; u.state='walk'; } else u.state='act'; } }; }
+
+/* 12:34 – Abzählen */
+EVDEFS.count1234={w:0, ok:function(){ return true; }, make:function(){
+  var tr=UNITS.filter(function(u){ return u.troop&&!u.away&&!u.hidden&&!u.ai; }).slice(0,4); if (tr.length<2) tr=outside().slice(0,4);
+  tr.forEach(function(u,k){ var p=tileOnLane(-3+k*2,45); u.order={i:Math.floor(p[0]),j:Math.floor(p[1]),act:'guard',dur:40,fx:p[0]%1,fy:p[1]%1,run:true}; u.state='idle'; });
+  return {tr:tr,msg:'12:34 – ANTRETEN ZUM ABZÄHLEN!',update:function(){ return this.t<40; },
+    front:function(g){ var k=Math.floor((this.t-12)/1.5); if (k<0) return; this.tr.forEach(function(u,i){ if (i<=k && u.sx) drawText(g,String(i+1),u.sx-1,u.sy-14,2,'#ffffff','#14101a'); });
+      if (k>=this.tr.length && k<this.tr.length+3) drawText(g,'VOLLZÄHLIG!',ox-textW('VOLLZÄHLIG!',1)/2,Y(140),1,'#ffe08a','#14101a'); } };
+}};
+/* 04:04 – Seite nicht gefunden */
+EVDEFS.notfound={w:0, ok:function(){ return true; }, make:function(){ allSay('?',1);
+  return {msg:'04:04 – SEITE NICHT GEFUNDEN. DAS GANZE DORF SUCHT …',update:function(){ if (R()<.02) allSay('?',.3); return this.t<60; },
+    world:function(items){ var p=iso(19.5,23.5); items.push({depth:44,draw:function(g){ var x=Math.round(p[0]),y=Math.round(p[1]);
+      drawRects(g,[[x,y-12,1,12,'#6b4a30'],[x-10,y-20,21,9,'#f2e2bc']]); drawText(g,'404',x-5,y-18,1,'#c8402e'); }}); } };
+}};
+/* 14.03. – Pi-Tag */
+EVDEFS.piday={w:0, ok:function(){ return true; }, make:function(){
+  outside().slice(0,8).forEach(function(u){ u.order={i:20,j:24,act:'cheer',dur:30}; u.state='idle'; });
+  return {msg:'HAPPY PI-DAY! 3,14159 … STÜCKE KUCHEN FÜR ALLE!',update:function(){ return this.t<1200; },
+    world:function(items){ var p=iso(21,25); items.push({depth:46,draw:function(g){ var x=Math.round(p[0]),y=Math.round(p[1]);
+      drawRects(g,[[x-9,y-7,18,6,'#d89048'],[x-9,y-8,18,2,'#f0d8a0']]); for (var k=-7;k<8;k+=3) px(g,shade('#c84a6a'),x+k,y-7);
+      px(g,'#ffffff',x-3,y-15,7,1); px(g,'#ffffff',x-2,y-14,1,4); px(g,'#ffffff',x+2,y-14,1,4); }}); } };
+}};
+/* 19.09. – Piraten-Tag */
+var PIRART=null;
+function pirateShip(){ if (PIRART) return PIRART; var c=ART.airship, o=mkCanvas(c.width,c.height), g=o.getContext('2d'); g.drawImage(c,0,0);
+  g.globalCompositeOperation='source-atop'; g.fillStyle='rgba(30,26,34,.82)'; g.fillRect(0,0,o.width,9); g.globalCompositeOperation='source-over';
+  px(g,'#ffffff',13,2,4,3); px(g,'#1a1a22',14,3,1,1); px(g,'#1a1a22',16,3,1,1); px(g,'#ffffff',12,6,1,1); px(g,'#ffffff',17,6,1,1); PIRART=o; return o; }
+EVDEFS.pirates={w:0, ok:function(){ return true; }, make:function(){ allSay('!',.8);
+  return {x:-40,y:Y(70),msg:'AHOI! HEUTE IST SPRICH-WIE-EIN-PIRAT-TAG – ARRR!',update:function(dt){ this.x+=20*dt; return this.x<W+40; },
+    front:function(g,t){ groundShadow(g,this.x+15,this.y+70,14); drawArt(g,pirateShip(),this.x,this.y+Math.sin(t*1.5)*1.5,false);
+      if (Math.floor(t)%3===0) UNITS.forEach(function(u){ if (u.sx && !u.enemy && (u.id*10|0)%2) drawText(g,'ARRR!',u.sx-9,u.sy-14,1,'#ffffff','#14101a'); }); } };
+}};
+/* 08.08. – Weltkatzentag & Freitag der 13. Katzen */
+EVDEFS.cats={w:0, ok:function(){ return true; }, make:function(){
+  var cs=[]; for (var k=0;k<8;k++){ var t=randomFree(4,4,30,30)||[17,24]; cs.push(mkUnit('cat',t[0]+.5,t[1]+.5,{noUmb:true,col:pick(R,['#222','#e08a30','#f4f0e6','#8a8a90','#c8a060']),ai:wanderAI(.8)})); }
+  return {cs:cs,msg:'HEUTE IST WELTKATZENTAG – DIE FESTUNG GEHÖRT DEN KATZEN!',update:function(){ if (R()<.01){ var c=pick(R,this.cs); say(c,'♥',2); } if (this.t>600){ this.cs.forEach(function(c){ c.dead=true; }); return false; } return true; } };
+}};
+/* 29.02. – Goldener Frosch */
+EVDEFS.frog={w:0, ok:function(){ return true; }, make:function(){ var fr=mkUnit('frog',27.5,26.5,{noUmb:true,ai:wanderAI(.6)});
+  return {fr:fr,msg:'SCHALTTAG! DER GOLDENE FROSCH ZEIGT SICH NUR ALLE VIER JAHRE.',update:function(){ if (R()<.03){ var p=iso(fr.x,fr.y); addPart({x:p[0],y:p[1]-4,vx:rr(R,-8,8),vy:-15,g:0,life:0,max:.8,col:'#fff3b0',glow:true}); }
+    if (this.t>900){ fr.dead=true; return false; } return true; } };
+}};
+/* 13.09. – Tag der Programmierer */
+EVDEFS.binary={w:0, ok:function(){ return true; }, make:function(){
+  return {msg:'TAG DER PROGRAMMIERER: 01001000 01000001 01001100 01001100 01001111 = HALLO!',msgDur:30,update:function(){ return this.t<300; },
+    front:function(g,t){ UNITS.forEach(function(u){ if (u.sx && !u.enemy && Math.floor(t*2+u.id*7)%5===0) drawText(g,(u.id*100|0)%2?'0101':'1010',u.sx-7,u.sy-14,1,'#7aff8a','#0a1a0a'); }); } };
+}};
+/* Geburtstagstorte (Geburtstag aus config.js oder Song) */
+EVDEFS.cake={w:0, ok:function(){ return true; }, make:function(){
+  outside().slice(0,10).forEach(function(u){ u.order={i:20,j:24,act:'cheer',dur:30}; u.state='idle'; });
+  return {msg:'HAPPY BIRTHDAY! ♥ DIE GANZE FESTUNG GRATULIERT!',update:function(dt){ if (R()<dt*3){ var p=iso(21,25); addPart({x:p[0]+rr(R,-8,8),y:p[1]-20,vx:rr(R,-10,10),vy:rr(R,-20,-5),g:20,life:0,max:2,col:pick(R,['#ff7fd8','#ffd84d','#7fd0ff','#8aff7f'])}); } return this.t<600; },
+    world:function(items,t){ var p=iso(21,25); items.push({depth:46,draw:function(g){ var x=Math.round(p[0]),y=Math.round(p[1]);
+      drawRects(g,[[x-8,y-6,16,5,'#f4e4f0'],[x-6,y-11,12,5,'#ff9ac8'],[x-4,y-15,8,4,'#f4e4f0']]);
+      for (var k=-3;k<4;k+=2){ px(g,'#f4f0e6',x+k,y-18,1,3); px(g,Math.floor(t*8+k)%2?'#ffd84d':'#ff9a30',x+k,y-19); }
+      [[-12,'#ff4d4d'],[12,'#4db8ff'],[-15,'#ffd84d']].forEach(function(b){ var bx=x+b[0], by=y-28+Math.round(Math.sin(t*2+b[0])*2); g.fillStyle='rgba(240,240,240,.6)'; g.fillRect(bx,by+5,1,12); drawRects(g,[[bx-2,by,5,6,b[1]]]); }); }}); } };
+}};
+/* Dorf-Jubiläum */
+EVDEFS.jubilee={w:0, ok:function(){ return true; }, make:function(){ startEvent('party'); if (env.darkness>.5) startEvent('fireworks');
+  return {msg:'TAG '+VILLAGE.day+' – DIE FESTUNG FEIERT JUBILÄUM! ★',update:function(){ return this.t<60; } }; }};
+/* Konfetti (Karneval) und Herzen (Valentinstag) */
+EVDEFS.confetti={w:0, ok:function(){ return true; }, make:function(){ var heart=env.sp.valentine;
+  return {update:function(dt){ if (R()<dt*(heart?2:6)) addPart({x:rr(R,0,W),y:-4,vx:rr(R,-8,8),vy:rr(R,12,25),g:0,life:0,max:rr(R,8,14),col:heart?'#ff6fae':pick(R,['#ff4d4d','#4dff88','#ffd84d','#4db8ff','#ff7fd8']),s:heart?2:1});
+    return env.sp.carnival||env.sp.valentine; } }; }};
+/* Nikolausstiefel vor den Türen */
+function nikolausWorld(items){ if (!env.sp.nikolaus) return;
+  BUILD.forEach(function(b){ if (!(b.lvl>=1)||b.kind==='pond'||b.kind==='cannon'||b.kind==='mortar') return; var p=iso(b.i+b.n*.7,b.j+b.n+.25);
+    items.push({depth:b.i+b.j+2*b.n,draw:function(g){ var x=Math.round(p[0]),y=Math.round(p[1]); drawRects(g,[[x-2,y-5,2,5,'#c8302e'],[x-2,y-1,4,1,'#c8302e'],[x-2,y-6,2,1,'#f4f4f4']]); px(g,shade('#f2c13b'),x-1,y-7); px(g,shade('#e84a3a'),x,y-7); }}); }); }
+
+/* Rekorde, erster Schnee, Gefrierpunkt */
+function recordsTick(d){
+  if (preset!=='live' || liveStatus!=='ok') return;
+  var y=d.getFullYear(), key='pd_rec_'+y, rec={}; try { rec=JSON.parse(lsGet(key)||'{}'); } catch(e){}
+  var t=Math.round(wx.temp*10)/10, ch=false;
+  if (rec.max===undefined||t>rec.max){ if (rec.max!==undefined && t>=20) showMsg('NEUER HITZEREKORD '+y+': '+Math.round(t)+'°! ALLE IN DEN SCHATTEN!',60,4); rec.max=t; ch=true; }
+  if (rec.min===undefined||t<rec.min){ if (rec.min!==undefined && t<=-3) showMsg('NEUER KÄLTEREKORD '+y+': '+Math.round(t)+'°! BRRR!',60,4); rec.min=t; ch=true; }
+  if (ch) lsSet(key,JSON.stringify(rec));
+  if (Math.round(wx.temp)===0 && eggOnce('zero'+d.toDateString())) showMsg('GEFRIERPUNKT! GENAU 0 GRAD.',30,3);
+  var sk='pd_snow_'+(d.getMonth()>=6?y:y-1);
+  if ((wx.snow>0||env.snowy) && !lsGet(sk)){ lsSet(sk,'1'); showMsg('DER ERSTE SCHNEE DES WINTERS! ALLE RENNEN RAUS!',60,5); startEvent('snowball'); allSay('♥',1); }
+}
+
+/* Minuten-Takt */
+function eggMinute(d){
+  var h=d.getHours(), m=d.getMinutes(), hm=pad2(h)+':'+pad2(m), md=pad2(d.getMonth()+1)+'-'+pad2(d.getDate()), day=d.toDateString();
+  if (hm==='12:34') startEvent('count1234');
+  if (hm==='04:04') startEvent('notfound');
+  if (hm==='22:22' && eggOnce('2222'+day)){ showMsg('22:22 – SCHNAPSZAHL! WÜNSCH DIR WAS.',60,3); if (env.darkness>.6) startEvent('star'); }
+  if (hm==='00:00'){ showMsg('GEISTERSTUNDE …',60,3); startEvent('ghost'); }
+  if (d.getDay()===0 && hm==='10:00') { showMsg('SONNTAGSGLOCKEN ÜBER DER FESTUNG',30,2); startEvent('bell'); }
+  if (workingNow(d)==='N' && hm==='03:00') showMsg('HALBZEIT DER NACHTSCHICHT – ZEIT FÜR EINEN KAFFEE!',60,3);
+  if (md==='03-14' && h>=9 && eggOnce('pi'+day)) startEvent('piday');
+  if (md==='09-19' && h>=10 && eggOnce('pir'+day)) startEvent('pirates');
+  if (md==='09-19' && h>=10 && m===0 && h%3===1) startEvent('pirates');
+  if (md==='08-08' && h>=8 && eggOnce('cat'+day)) startEvent('cats');
+  if (env.sp.fri13 && h>=20 && eggOnce('f13cat'+day)) startEvent('cats');
+  if (md==='02-29' && h>=8 && eggOnce('frog'+day)) startEvent('frog');
+  var prog=(new Date(d.getFullYear(),1,29).getDate()===29)?'09-12':'09-13';
+  if (md===prog && h>=9 && eggOnce('bin'+day)) startEvent('binary');
+  if (env.sp.birthday && h>=9 && eggOnce('cake'+day)) startEvent('cake');
+  if ((env.sp.carnival||env.sp.valentine) && !eventActive('confetti')) startEvent('confetti');
+  if ([7,30,100,200,365,500,1000].indexOf(VILLAGE.day)>=0){ if (eggOnce('jub'+VILLAGE.day)) startEvent('jubilee'); else if (m===0 && h%2===0) showMsg('TAG '+VILLAGE.day+' – JUBILÄUM DER FESTUNG! ★',30,2); }
+  recordsTick(d);
+}
+/* seltene Zufälle beim Ereignis-Würfeln */
+var _pickEvent2=pickEvent;
+pickEvent=function(){
+  if (R()<.001){ CHEATS.golddragon(); return null; }
+  if (R()<.002){ var e=EVDEFS.chicken.make(); if (e){ e.id='chicken'; e.t=0; EVENTS.push(e); e.h.gold=true; showMsg('EIN GOLDENES RIESENHUHN!? DAS GLAUBT DIR KEINER.',15,5); } return null; }
+  return _pickEvent2();
+};
+/* mehr Songs, auf die die Festung reagiert */
+var _songFx=songFx;
+songFx=function(title){
+  _songFx(title); var t=norm(title);
+  if (/HAPPY BIRTHDAY|GEBURTSTAG/.test(t)) startEvent('cake');
+  else if (/PIRAT/.test(t)) startEvent('pirates');
+  else if (/THUNDER|DONNER|GEWITTER|STORM|STURM|LIGHTNING|BLITZ/.test(t)){ flash=1; boltT=0; showMsg('PASSEND ZUM SONG: DONNERWETTER!',8,3); }
+  else if (/CAT|KATZE|MIAU/.test(t)) startEvent('cats');
+  else if (/CHICKEN|HUHN|HÜHNER/.test(t)) startEvent('chicken');
+  else if (/GOLD|MONEY|GELD|RICH|REICH/.test(t)) CHEATS.goldrain();
+  else if (/DISCO|PARTY/.test(t)) startEvent('fireworks');
+  else if (/BATTLE|KAMPF|WARRIOR|KRIEGER|KNIGHT|RITTER/.test(t)) startEvent('tournament');
+};
+
 /* ---------- Gewitter, Glühwürmchen, Disco, Teich ---------- */
 var flash=0, boltT=4, bolt=null, flash2=-1;
 function updateStorm(dt){
@@ -2054,7 +2197,7 @@ function frame(ts){
   var g=ctx; g.drawImage(terrain.lit,0,0); drawPond(g,t);
   var items=OBJ.slice();
   UNITS.forEach(function(u){ if (u.state!=='home'&&!u.hidden) items.push({depth:u.x+u.y,u:u}); });
-  EVENTS.forEach(function(e){ if (e.world) e.world(items,t); }); nestWorld(items);
+  EVENTS.forEach(function(e){ if (e.world) e.world(items,t); }); nestWorld(items); nikolausWorld(items);
   items.sort(function(a,b){ return (a.b?a.depth-.01:a.depth)-(b.b?b.depth-.01:b.depth); });
   for (var i=0;i<items.length;i++){
     var it=items[i];
