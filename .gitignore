@@ -1,0 +1,4 @@
+config.js
+pi-settings.sh
+*.pyc
+__pycache__/

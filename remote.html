@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2a1a10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Pixeldorf – Fernbedienung</title>
+<style>
+  :root{--wood:#8a5a32;--dark:#2a1a10;--cream:#f2e2bc;--gold:#f2c13b;--ink:#14101a}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#3d6b2a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='8' height='8' fill='%2342732d'/%3E%3Crect x='8' y='8' width='8' height='8' fill='%2342732d'/%3E%3C/svg%3E");color:var(--cream);padding:max(12px,env(safe-area-inset-top)) 12px 40px;min-height:100vh}
+  h1{margin:4px 0 2px;font-size:22px;text-align:center;color:#fff;text-shadow:0 2px 0 var(--ink),0 0 6px #000}
+  .sub{text-align:center;font-size:12px;opacity:.85;margin-bottom:10px;text-shadow:0 1px 0 #000}
+  .card{background:var(--wood);border:3px solid var(--ink);border-radius:12px;box-shadow:inset 0 3px 0 #a8743e,inset 0 -3px 0 #6a4424,0 4px 0 rgba(0,0,0,.35);padding:10px 10px 12px;margin:12px 0}
+  .card h2{margin:0 0 8px;font-size:15px;color:#fff;text-shadow:0 2px 0 var(--ink);letter-spacing:.5px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .grid.two{grid-template-columns:repeat(2,1fr)}
+  button{font:inherit;font-weight:700;font-size:13px;color:var(--ink);background:linear-gradient(#fff3cc,#f2c13b);border:3px solid var(--ink);border-radius:10px;padding:10px 4px;box-shadow:0 3px 0 var(--ink);cursor:pointer;min-height:58px;line-height:1.15}
+  button .e{display:block;font-size:22px;margin-bottom:2px}
+  button:active{transform:translateY(3px);box-shadow:0 0 0 var(--ink)}
+  button.red{background:linear-gradient(#ffb3a8,#e8402e);color:#fff;text-shadow:0 1px 0 var(--ink)}
+  button.blue{background:linear-gradient(#bfe4ff,#3a90e8);color:#fff;text-shadow:0 1px 0 var(--ink)}
+  button.green{background:linear-gradient(#d4ffb0,#5cbf3a)}
+  button.purple{background:linear-gradient(#e6c8ff,#8e44ad);color:#fff;text-shadow:0 1px 0 var(--ink)}
+  textarea,input{width:100%;font:inherit;font-size:16px;border:3px solid var(--ink);border-radius:10px;padding:10px;background:var(--cream);color:var(--ink)}
+  textarea{height:64px;resize:none}
+  .row{display:flex;gap:8px;margin-top:8px}.row>*{flex:1}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chips button{min-height:0;padding:6px 10px;font-size:12px;flex:0 0 auto}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(120px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:20px;border:2px solid var(--gold);font-weight:700;transition:transform .25s;z-index:9}
+  #toast.show{transform:translateX(-50%) translateY(0)}
+  .secret{display:none}.secret.open{display:block}
+  .hint{font-size:12px;opacity:.9;margin-top:6px}
+  #setup{display:none}
+</style>
+</head>
+<body>
+<h1 id="title">🏰 Pixeldorf</h1>
+<div class="sub" id="sub">Fernbedienung für deine Festung</div>
+
+<div class="card" id="setup">
+  <h2>Verbinden</h2>
+  <div class="hint">Öffne den Link, den der Pi bei der Einrichtung angezeigt hat, oder füge hier den Kanal ein (beginnt mit „pd-“).</div>
+  <div class="row"><input id="topicIn" placeholder="pd-…"><button class="green" style="flex:0 0 90px;min-height:0" onclick="setTopic()">OK</button></div>
+</div>
+
+<div class="card">
+  <h2>📜 Nachricht ins Banner</h2>
+  <textarea id="msg" maxlength="140" placeholder="z. B. Essen ist fertig!"></textarea>
+  <div class="row"><button class="green" onclick="sendMsg()"><span class="e">📣</span>Ausrufen lassen</button></div>
+  <div class="chips">
+    <button onclick="quick('Essen ist fertig!')">🍲 Essen ist fertig</button>
+    <button onclick="quick('Komme gleich nach Hause!')">🏃 Komme gleich</button>
+    <button onclick="quick('Gute Nacht!')">🌙 Gute Nacht</button>
+    <button onclick="quick('Ich hab dich lieb!')">❤️ Hab dich lieb</button>
+    <button onclick="quick('Alles Gute zum Geburtstag!')">🎂 Geburtstag</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>⚔️ Kampf</h2>
+  <div class="grid">
+    <button class="red" onclick="ev('raid')"><span class="e">👺</span>Angriff</button>
+    <button class="red" onclick="ev('siege')"><span class="e">🏹</span>Belagerung</button>
+    <button class="red" onclick="ev('chicken')"><span class="e">🐔</span>Riesenhuhn</button>
+    <button onclick="ev('expedition')"><span class="e">🗡️</span>Raubzug</button>
+    <button onclick="ev('tournament')"><span class="e">🐴</span>Turnier</button>
+    <button onclick="ev('fire')"><span class="e">🔥</span>Feuer</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>🐉 Am Himmel</h2>
+  <div class="grid">
+    <button onclick="ev('dragon')"><span class="e">🐉</span>Drache</button>
+    <button onclick="ev('airship')"><span class="e">🎈</span>Luftschiff</button>
+    <button onclick="ev('balloon')"><span class="e">🎈</span>Ballon</button>
+    <button onclick="ev('whale')"><span class="e">🐋</span>Himmelswal</button>
+    <button class="blue" onclick="ev('ufo')"><span class="e">🛸</span>Ufo</button>
+    <button class="blue" onclick="ev('fireworks')"><span class="e">🎆</span>Feuerwerk</button>
+    <button class="blue" onclick="ev('star')"><span class="e">🌠</span>Stern&shy;schnuppe</button>
+    <button class="blue" onclick="ev('meteors')"><span class="e">☄️</span>Meteore</button>
+    <button onclick="ev('nest')"><span class="e">🥚</span>Drachennest</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>🎪 Im Dorf</h2>
+  <div class="grid">
+    <button onclick="ev('fair')"><span class="e">🎡</span>Jahrmarkt</button>
+    <button onclick="ev('goldrush')"><span class="e">💰</span>Goldrausch</button>
+    <button onclick="ev('caravan')"><span class="e">🐫</span>Karawane</button>
+    <button onclick="ev('wedding')"><span class="e">💒</span>Hochzeit</button>
+    <button onclick="ev('treasure')"><span class="e">🧰</span>Schatz</button>
+    <button onclick="ev('bard')"><span class="e">🎻</span>Barde</button>
+    <button class="blue" onclick="ev('gnomes')"><span class="e">🧙</span>Gnome</button>
+    <button class="blue" onclick="ev('ghost')"><span class="e">👻</span>Gespenst</button>
+    <button onclick="ev('babies')"><span class="e">🐲</span>Baby&shy;drachen</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>🎶 Party</h2>
+  <div class="grid two">
+    <button class="purple" onclick="send({c:'party',on:true},'Party an!')"><span class="e">🕺</span>Party an</button>
+    <button onclick="send({c:'party',on:false},'Party aus')"><span class="e">😴</span>Party aus</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>🌦️ Wetter-Vorschau</h2>
+  <div class="grid">
+    <button class="green" onclick="wx('live')"><span class="e">📡</span>Echtes Wetter</button>
+    <button onclick="wx('clear')"><span class="e">☀️</span>Sonnig</button>
+    <button onclick="wx('partly')"><span class="e">⛅</span>Wolkig</button>
+    <button onclick="wx('windy')"><span class="e">💨</span>Sturm&shy;böen</button>
+    <button onclick="wx('rain')"><span class="e">🌧️</span>Regen</button>
+    <button onclick="wx('storm')"><span class="e">⛈️</span>Gewitter</button>
+    <button onclick="wx('snow')"><span class="e">❄️</span>Schnee</button>
+    <button onclick="wx('fog')"><span class="e">🌫️</span>Nebel</button>
+    <button onclick="wx('hot')"><span class="e">🥵</span>Hitze</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>⏳ Zeit & Bildschirm</h2>
+  <div class="grid">
+    <button onclick="send({c:'time',h:1},'+1 Stunde')"><span class="e">🕐</span>+1 Stunde</button>
+    <button onclick="send({c:'grow',days:1},'+1 Tag Bauzeit')"><span class="e">🔨</span>Tag vor&shy;spulen</button>
+    <button class="green" onclick="send({c:'reset'},'Alles wieder echt')"><span class="e">↩️</span>Alles echt</button>
+    <button onclick="send({c:'screen',on:true},'Bildschirm an')"><span class="e">💡</span>Bild&shy;schirm an</button>
+    <button onclick="send({c:'screen',on:false},'Bildschirm aus')"><span class="e">🌑</span>Bild&shy;schirm aus</button>
+    <button onclick="send({c:'cheat',id:'reload'},'Neu laden')"><span class="e">🔄</span>Neu laden</button>
+  </div>
+</div>
+
+<div class="card secret" id="secret">
+  <h2>🔐 Geheimfach</h2>
+  <div class="grid">
+    <button class="purple" onclick="cheat('golddragon')"><span class="e">✨</span>Gold&shy;drache</button>
+    <button class="purple" onclick="cheat('goldrain')"><span class="e">🪙</span>Gold&shy;regen</button>
+    <button class="purple" onclick="cheat('disco')"><span class="e">🪩</span>Disco</button>
+    <button class="purple" onclick="cheat('megaraid')"><span class="e">💀</span>Mega-Angriff</button>
+    <button class="purple" onclick="cheat('allevents')"><span class="e">🎇</span>Alles auf einmal</button>
+  </div>
+</div>
+<div class="hint" style="text-align:center;text-shadow:0 1px 0 #000">Tipp: Tippe fünfmal auf die Burg oben …</div>
+
+<div id="toast"></div>
+<script>
+var topic='';
+try { topic=(location.hash||'').replace('#','')||localStorage.getItem('pd_topic')||''; if (topic) localStorage.setItem('pd_topic',topic); } catch(e) {}
+if (!topic) document.getElementById('setup').style.display='block';
+else document.getElementById('sub').textContent='Verbunden mit deiner Festung';
+function setTopic(){ var v=document.getElementById('topicIn').value.trim(); var m=v.match(/pd-[0-9a-f]+/); if (!m) return toast('Kanal nicht erkannt'); topic=m[0]; try{localStorage.setItem('pd_topic',topic);}catch(e){} document.getElementById('setup').style.display='none'; toast('Verbunden!'); }
+function toast(t){ var el=document.getElementById('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(window._tt); window._tt=setTimeout(function(){ el.classList.remove('show'); },1800); }
+function send(cmd,label){
+  if (!topic){ document.getElementById('setup').style.display='block'; return toast('Erst verbinden'); }
+  if (navigator.vibrate) navigator.vibrate(20);
+  fetch('https://ntfy.sh/'+encodeURIComponent(topic),{method:'POST',body:JSON.stringify(cmd)})
+    .then(function(r){ toast(r.ok?(label||'Gesendet!')+' ✓':'Fehler '+r.status); })
+    .catch(function(){ toast('Keine Verbindung'); });
+}
+function ev(id){ send({c:'event',id:id},'Ereignis gestartet'); }
+function wx(p){ send({c:'weather',p:p},'Wetter: '+p); }
+function cheat(id){ send({c:'cheat',id:id},'Cheat aktiviert'); }
+function sendMsg(){ var t=document.getElementById('msg').value.trim(); if (!t) return toast('Erst etwas schreiben'); send({c:'msg',t:t},'Wird ausgerufen'); document.getElementById('msg').value=''; }
+function quick(t){ send({c:'msg',t:t},'Wird ausgerufen'); }
+var taps=0; document.getElementById('title').addEventListener('click',function(){ taps++; clearTimeout(window._tp); window._tp=setTimeout(function(){ taps=0; },1500); if (taps>=5){ document.getElementById('secret').classList.add('open'); toast('Geheimfach geöffnet 🔓'); taps=0; } });
+</script>
+</body>
+</html>
