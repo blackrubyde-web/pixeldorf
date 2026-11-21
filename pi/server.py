@@ -4,8 +4,9 @@
 - liefert die Dateien aus dem Projektordner aus (nur für diesen Pi: 127.0.0.1)
 - /api/proxy?url=...    holt Daten von erlaubten Seiten (Nachrichten, Polarlicht, Warnungen)
 - /api/screen?state=on|off  schaltet den Bildschirm an oder aus
+- /api/health           Temperatur und Strom-Status des Pi
 """
-import http.server, socketserver, urllib.request, urllib.parse, subprocess, os, sys
+import http.server, socketserver, urllib.request, urllib.parse, subprocess, os, sys, json
 
 DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = int(os.environ.get('PD_PORT', '8000'))
@@ -41,6 +42,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         q = urllib.parse.parse_qs(u.query)
         if u.path == '/api/ping':
             return self._send(200, b'ok')
+        if u.path == '/api/health':
+            info = {}
+            try:
+                t = subprocess.run(['vcgencmd', 'measure_temp'], capture_output=True, text=True, timeout=5).stdout
+                info['temp'] = float(t.split('=')[1].split("'")[0])
+            except Exception:
+                try:
+                    info['temp'] = int(open('/sys/class/thermal/thermal_zone0/temp').read()) / 1000.0
+                except Exception:
+                    pass
+            try:
+                th = subprocess.run(['vcgencmd', 'get_throttled'], capture_output=True, text=True, timeout=5).stdout
+                info['throttled'] = int(th.split('=')[1].strip(), 16)
+            except Exception:
+                pass
+            return self._send(200, json.dumps(info).encode(), 'application/json')
         if u.path == '/api/screen':
             on = q.get('state', ['on'])[0] != 'off'
             args = ['wlr-randr', '--output', OUTPUT] + (['--on', '--mode', MODE, '--transform', TRANSFORM] if on else ['--off'])

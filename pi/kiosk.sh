@@ -12,6 +12,9 @@ PD_PORT=8000
 [ -f "$DIR/pi-settings.sh" ] && . "$DIR/pi-settings.sh"
 export PD_OUTPUT PD_MODE PD_TRANSFORM PD_PORT
 
+# einmalige Systemanpassungen aus Updates (z. B. automatischer Neustart bei Absturz)
+[ -f "$DIR/pi/migrate.sh" ] && sudo -n bash "$DIR/pi/migrate.sh" >/dev/null 2>&1
+
 sleep 10
 wlr-randr --output "$PD_OUTPUT" --on --mode "$PD_MODE" --transform "$PD_TRANSFORM" || wlr-randr --output "$PD_OUTPUT" --transform "$PD_TRANSFORM"
 command -v unclutter >/dev/null && unclutter &

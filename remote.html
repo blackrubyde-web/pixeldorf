@@ -33,6 +33,15 @@
   .secret{display:none}.secret.open{display:block}
   .hint{font-size:12px;opacity:.9;margin-top:6px}
   #setup{display:none}
+  .stat{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+  .stat div{background:var(--cream);border:3px solid var(--ink);border-radius:10px;padding:6px 4px;text-align:center;color:var(--ink);font-weight:700;font-size:18px}
+  .stat small{display:block;font-size:10px;font-weight:600;opacity:.75}
+  .line{background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px;margin-top:5px;font-size:13px;color:#fff;text-shadow:0 1px 0 #000}
+  .ach{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+  .ach div{background:rgba(0,0,0,.3);border-radius:8px;padding:6px;font-size:11px;color:#fff;opacity:.45}
+  .ach div.on{opacity:1;background:linear-gradient(#f2c13b,#c8901c);color:var(--ink)}
+  .ach b{display:block;font-size:12px}
+  .muted{opacity:.8;font-size:12px;color:#fff;text-align:center;padding:6px}
 </style>
 </head>
 <body>
@@ -43,6 +52,14 @@
   <h2>Verbinden</h2>
   <div class="hint">Öffne den Link, den der Pi bei der Einrichtung angezeigt hat, oder füge hier den Kanal ein (beginnt mit „pd-“).</div>
   <div class="row"><input id="topicIn" placeholder="pd-…"><button class="green" style="flex:0 0 90px;min-height:0" onclick="setTopic()">OK</button></div>
+</div>
+
+
+<div class="card" id="statusCard">
+  <h2>🏆 Deine Festung <span id="stAge" style="float:right;font-size:11px;opacity:.8"></span></h2>
+  <div id="stBody"><div class="muted">Frage die Festung nach ihrem Zustand …</div></div>
+  <div class="row"><button class="green" onclick="askStatus()" style="min-height:0;padding:8px">🔄 Aktualisieren</button><button onclick="toggleAch()" style="min-height:0;padding:8px">🎖️ Erfolge</button><button onclick="send({c:'report'},'Tagesbericht läuft')" style="min-height:0;padding:8px">📜 Bericht</button></div>
+  <div class="ach" id="achList" style="display:none"></div>
 </div>
 
 <div class="card">
@@ -135,6 +152,16 @@
   </div>
 </div>
 
+<div class="card">
+  <h2>🤖 Automatik</h2>
+  <div class="hint" style="margin:0 0 8px">Bildschirm geht automatisch aus, während du auf der Arbeit bist (45 Min. vor Schichtbeginn bis 45 Min. nach Schichtende), und begrüßt dich, wenn du heimkommst.</div>
+  <div class="grid two">
+    <button class="green" onclick="send({c:'shiftscreen',on:true},'Automatik an')"><span class="e">🌙</span>Automatik an</button>
+    <button onclick="send({c:'shiftscreen',on:false},'Automatik aus')"><span class="e">💡</span>Immer an</button>
+  </div>
+  <div class="line" id="autoState" style="display:none"></div>
+</div>
+
 <div class="card secret" id="secret">
   <h2>🔐 Geheimfach</h2>
   <div class="grid">
@@ -153,7 +180,7 @@ var topic='';
 try { topic=(location.hash||'').replace('#','')||localStorage.getItem('pd_topic')||''; if (topic) localStorage.setItem('pd_topic',topic); } catch(e) {}
 if (!topic) document.getElementById('setup').style.display='block';
 else document.getElementById('sub').textContent='Verbunden mit deiner Festung';
-function setTopic(){ var v=document.getElementById('topicIn').value.trim(); var m=v.match(/pd-[0-9a-f]+/); if (!m) return toast('Kanal nicht erkannt'); topic=m[0]; try{localStorage.setItem('pd_topic',topic);}catch(e){} document.getElementById('setup').style.display='none'; toast('Verbunden!'); }
+function setTopic(){ setTimeout(listen,300);  var v=document.getElementById('topicIn').value.trim(); var m=v.match(/pd-[0-9a-f]+/); if (!m) return toast('Kanal nicht erkannt'); topic=m[0]; try{localStorage.setItem('pd_topic',topic);}catch(e){} document.getElementById('setup').style.display='none'; toast('Verbunden!'); }
 function toast(t){ var el=document.getElementById('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(window._tt); window._tt=setTimeout(function(){ el.classList.remove('show'); },1800); }
 function send(cmd,label){
   if (!topic){ document.getElementById('setup').style.display='block'; return toast('Erst verbinden'); }
@@ -167,6 +194,41 @@ function wx(p){ send({c:'weather',p:p},'Wetter: '+p); }
 function cheat(id){ send({c:'cheat',id:id},'Cheat aktiviert'); }
 function sendMsg(){ var t=document.getElementById('msg').value.trim(); if (!t) return toast('Erst etwas schreiben'); send({c:'msg',t:t},'Wird ausgerufen'); document.getElementById('msg').value=''; }
 function quick(t){ send({c:'msg',t:t},'Wird ausgerufen'); }
+
+/* ---------- Status von der Festung ---------- */
+var lastSt=null, stTime=0;
+function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function cap(t){ t=String(t||'').toLowerCase(); return t.replace(/(^|[\s(–-])([a-zäöü])/g,function(m,a,b){ return a+b.toUpperCase(); }).replace(/Km\/h/g,'km/h'); }
+function showStatus(st,ts){
+  lastSt=st; stTime=ts||Date.now();
+  var pi=st.pi||{}, piTxt=pi.temp?Math.round(pi.temp)+' °C'+((pi.throttled||0)&1?' ⚡ zu wenig Strom!':((pi.throttled||0)&0x50000?' (früher Strom knapp)':' ✓')):'–';
+  var got=(st.ach||[]).filter(function(a){ return a[2]; }).length, all=(st.ach||[]).length;
+  var h='<div class="stat"><div>'+esc(st.trophies)+'<small>🏆 Trophäen</small></div><div>'+esc(st.day)+'<small>📅 Tag</small></div><div>'+got+'/'+all+'<small>🎖️ Erfolge</small></div></div>';
+  h+='<div class="line">🌦️ '+esc(cap(st.weather))+'</div>';
+  if (st.shift) h+='<div class="line">🏭 '+esc(cap(st.shift))+'</div>';
+  if (st.music) h+='<div class="line">🎵 '+esc(st.music)+'</div>';
+  (st.cons||[]).forEach(function(c){ h+='<div class="line">🔨 '+esc(cap(c))+'</div>'; });
+  if (!(st.cons||[]).length) h+='<div class="line">🔨 Baumeister frei ('+esc(st.builders)+')</div>';
+  var s2=st.stats||{}; h+='<div class="line">⚔️ '+(s2.raids||0)+' Angriffe abgewehrt · '+(s2.sieges||0)+' Belagerungen · '+(s2.enemies||0)+' Feinde · '+(s2.dragons||0)+' Drachen · '+(s2.songs||0)+' Songs</div>';
+  h+='<div class="line">🍓 Pi: '+esc(piTxt)+(st.ver?' · Version '+esc(st.ver):'')+'</div>';
+  document.getElementById('stBody').innerHTML=h;
+  document.getElementById('achList').innerHTML=(st.ach||[]).map(function(a){ return '<div class="'+(a[2]?'on':'')+'"><b>'+(a[2]?'★ ':'🔒 ')+esc(cap(a[0]))+'</b>'+esc(cap(a[1]))+'</div>'; }).join('');
+  var as=document.getElementById('autoState'); as.style.display='block'; as.textContent=st.autoScreen?'Automatik ist AN: Bildschirm aus während der Schicht':'Automatik ist AUS: Bildschirm bleibt an';
+  ageTick();
+}
+function ageTick(){ if (!stTime) return; var m=Math.round((Date.now()-stTime)/60000); document.getElementById('stAge').textContent=m<1?'gerade eben':'vor '+m+' Min.'; }
+setInterval(ageTick,30000);
+function toggleAch(){ var el=document.getElementById('achList'); el.style.display=el.style.display==='none'?'grid':'none'; if (!lastSt) askStatus(); }
+function askStatus(){ if (!topic) return; fetch('https://ntfy.sh/'+encodeURIComponent(topic),{method:'POST',body:JSON.stringify({c:'status'})}).catch(function(){}); }
+var waitT=null;
+function listen(){
+  if (!topic || !window.EventSource) return;
+  var es=new EventSource('https://ntfy.sh/'+encodeURIComponent(topic)+'/sse?since=2h');
+  es.onmessage=function(ev){ try { var d=JSON.parse(ev.data); if (d.event&&d.event!=='message') return; var c=JSON.parse(d.message); if (c&&c.type==='status'){ clearTimeout(waitT); showStatus(c,(d.time||0)*1000||Date.now()); } } catch(e){} };
+  es.onopen=function(){ askStatus(); waitT=setTimeout(function(){ if (!lastSt) document.getElementById('stBody').innerHTML='<div class="muted">Die Festung antwortet nicht. Ist der Pi an?</div>'; },10000); };
+}
+listen();
+document.addEventListener('visibilitychange',function(){ if (!document.hidden) askStatus(); });
 var taps=0; document.getElementById('title').addEventListener('click',function(){ taps++; clearTimeout(window._tp); window._tp=setTimeout(function(){ taps=0; },1500); if (taps>=5){ document.getElementById('secret').classList.add('open'); toast('Geheimfach geöffnet 🔓'); taps=0; } });
 </script>
 </body>
